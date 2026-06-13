@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { GoogleGenAI } from "@google/genai";
 import { state } from "./state.js";
 import { startThinkingSpinner, logError } from "./utils.js";
-
+import "dotenv/config";
 // Token Optimization Limits for Free Tier
 const MAX_HISTORY_TURNS = 15;
 const MAX_TEXT_LENGTH = 40000;
