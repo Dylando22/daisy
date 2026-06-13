@@ -10,10 +10,22 @@ Daisy is a terminal-based AI assistant that integrates with Google's Gemini API 
 
 ## Configuration
 
-To run the assistant, you must create a `.env` file in the root directory of the project. Add your API key to this file:
+To use Daisy globally, you must provide your API key using one of the following methods:
+
+### 1. Environment Variable
+Set the `DAISY_API_KEY` environment variable in your shell profile (e.g., `~/.bashrc` or `~/.zshrc`):
 
 ```bash
-GEMINI_API_KEY=your_actual_api_key_here
+export DAISY_API_KEY=your_actual_api_key_here
+```
+
+### 2. Global Config File
+Create a JSON configuration file at `~/.daisy/config.json`:
+
+```json
+{
+  "apiKey": "your_actual_api_key_here"
+}
 ```
 
 ## Installation
@@ -21,10 +33,6 @@ GEMINI_API_KEY=your_actual_api_key_here
 1. Clone the repository.
 2. Run `npm install` to install dependencies (chalk, marked, @google/genai).
 3. Ensure you have a valid API key for Google's Generative AI.
-
-## Environment Variables
-
-- The project uses an hardcoded API key in `api.js` (Note: Ensure this is updated to use an environment variable like `GEMINI_API_KEY` for security).
 
 ## Usage
 

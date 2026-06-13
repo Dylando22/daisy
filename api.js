@@ -3,19 +3,46 @@ import { GoogleGenAI } from "@google/genai";
 import { state } from "./state.js";
 import { startThinkingSpinner, logError } from "./utils.js";
 import "dotenv/config";
+import os from "os";
+import path from "path";
+import fs from "fs";
+
 // Token Optimization Limits for Free Tier
 const MAX_HISTORY_TURNS = 15;
 const MAX_TEXT_LENGTH = 40000;
+
+function getApiKey() {
+  // 1. Check environment variables
+  if (process.env.DAISY_API_KEY || process.env.GEMINI_API_KEY) {
+    return process.env.DAISY_API_KEY || process.env.GEMINI_API_KEY;
+  }
+
+  // 2. Check global config file
+  const configPath = path.join(os.homedir(), '.daisy', 'config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return config.apiKey;
+    }
+  } catch (err) {
+    // Ignore error, return undefined
+  }
+  return null;
+}
 
 export async function callApi(prompt, streaming) {
   let spinnerInterval;
   try {
     state.apiError = null;
 
-    // 1. Build Contents Array (Exact Native Gemini Schema)
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error("API Key not found. Please set DAISY_API_KEY or create ~/.daisy/config.json");
+    }
+
+    // 1. Build Contents Array
     const rawContents = [];
 
-    // Parse History to strict alternating user/model roles
     if (Array.isArray(state.conversationBuffer)) {
       const historySlice = state.conversationBuffer
         .filter(
@@ -44,7 +71,6 @@ export async function callApi(prompt, streaming) {
       }
     }
 
-    // Add current prompt
     let cleanPrompt = prompt.replace(/^(User:)\s*/i, "").trim();
     if (cleanPrompt.length > MAX_TEXT_LENGTH) {
       cleanPrompt =
@@ -52,7 +78,6 @@ export async function callApi(prompt, streaming) {
     }
     rawContents.push({ role: "user", parts: [{ text: cleanPrompt }] });
 
-    // Native API STRICTLY requires alternating roles. Merge adjacent identical roles.
     const mergedContents = [];
     for (const item of rawContents) {
       if (
@@ -69,15 +94,12 @@ export async function callApi(prompt, streaming) {
       }
     }
 
-    // Prepare System Instruction
     let systemText = state.systemContext || state.AI_INSTRUCTIONS || "";
     if (state.directoryContext && state.directoryContextPending) {
       systemText += `\n\n[Directory Context]\n${state.directoryContext}`;
       state.directoryContextPending = false;
     }
 
-    // Initialize SDK Client
-    const apiKey = process.env.GEMINI_API_KEY;
     const client = new GoogleGenAI({ apiKey });
     const model = state.CURRENT_MODEL || "gemini-1.5-flash";
 
@@ -92,7 +114,6 @@ export async function callApi(prompt, streaming) {
       );
     }
 
-    // 3. Execution of Request
     if (streaming) {
       process.stdout.write(chalk.cyan.bold("\n ✦ DAISY (streaming):\n"));
       let fullResponse = "";
@@ -101,9 +122,7 @@ export async function callApi(prompt, streaming) {
       const responseStream = await client.models.generateContentStream({
         model: model,
         contents: mergedContents,
-        config: {
-          systemInstruction: systemText,
-        },
+        config: { systemInstruction: systemText },
       });
 
       for await (const chunk of responseStream) {
@@ -121,13 +140,10 @@ export async function callApi(prompt, streaming) {
       return fullResponse;
     } else {
       spinnerInterval = startThinkingSpinner();
-
       const response = await client.models.generateContent({
         model: model,
         contents: mergedContents,
-        config: {
-          systemInstruction: systemText,
-        },
+        config: { systemInstruction: systemText },
       });
 
       if (response.usageMetadata?.totalTokenCount) {
@@ -135,15 +151,10 @@ export async function callApi(prompt, streaming) {
       }
 
       let content = response.text || "";
-
-      const descMatch = content.match(
-        /<chatDescription>([\s\S]*?)<\/chatDescription>/i,
-      );
+      const descMatch = content.match(/<chatDescription>([\s\S]*?)<\/chatDescription>/i);
       if (descMatch) {
         state.chatDescription = `Chat Description: ${descMatch[1].trim()}`;
-        content = content
-          .replace(/<chatDescription>[\s\S]*?<\/chatDescription>\n*/i, "")
-          .trim();
+        content = content.replace(/<chatDescription>[\s\S]*?<\/chatDescription>\n*/i, "").trim();
       }
 
       return content;
