@@ -77,7 +77,7 @@ export async function callApi(prompt, streaming) {
     }
 
     // Initialize SDK Client
-    const apiKey = "AIzaSyBLAhzDkkJf1bGK2OzQzEkoYfdVbSPU-BA";
+    const apiKey = process.env.GEMINI_API_KEY;
     const client = new GoogleGenAI({ apiKey });
     const model = state.CURRENT_MODEL || "gemini-1.5-flash";
 
